@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-slate-950 text-slate-100 antialiased;
+  background-image:
+    radial-gradient(60rem 40rem at 15% -10%, rgba(99, 102, 241, 0.18), transparent),
+    radial-gradient(50rem 35rem at 90% 0%, rgba(168, 85, 247, 0.14), transparent);
+  background-attachment: fixed;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-800 bg-slate-900/70 p-6 shadow-xl shadow-black/20 backdrop-blur;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+      transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400
+      focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed
+      disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-indigo-600 text-white hover:bg-indigo-500 active:bg-indigo-700;
+  }
+
+  .btn-ghost {
+    @apply btn border border-slate-700 bg-slate-900/60 text-slate-200 hover:border-slate-500 hover:text-white;
+  }
+
+  .btn-option {
+    @apply flex h-16 w-full flex-col items-center justify-center gap-1 rounded-xl border border-slate-700
+      bg-slate-900/60 text-slate-200 transition hover:border-indigo-400 hover:bg-slate-800
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800/70
+      px-3 py-1 text-xs font-medium text-slate-300;
+  }
+
+  .label {
+    @apply mb-2 block text-sm font-semibold text-slate-300;
+  }
+}
+
+/* Keyboard focus visibility for every interactive element */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  @apply outline-none ring-2 ring-indigo-400 ring-offset-2 ring-offset-slate-950;
+}
