@@ -14,6 +14,11 @@ class AssessmentStart(BaseModel):
     user_id: str
     adaptive: bool = False
     version: str = "1.0"
+    # Phase 6 matching context (optional for backwards compatibility)
+    life_stage: Optional[str] = None      # 18-24 | 25-34 | 35-44 | 45-54 | 55+
+    career_phase: Optional[str] = None    # Student | Early career | Mid-career | ...
+    themes: Optional[List[str]] = None    # 1-3 theme ids
+    goal: Optional[str] = None
 
 
 class SubmitAnswers(BaseModel):
@@ -50,22 +55,56 @@ class BiographyOut(BaseModel):
     domain_tags: List[str]
     birth_year: Optional[int] = None
     nationality: Optional[str] = None
+    # Phase 6 enrichment
+    themes: Optional[List[str]] = None
+    challenges: Optional[List[str]] = None
+    fame_tier: Optional[int] = None
+    peak_life_stage: Optional[str] = None
+    source_url: Optional[str] = None
 
 
-class RecItemOut(BaseModel):
+class BreakdownItemOut(BaseModel):
+    key: str
+    label: str
+    weight: float
+    raw: float
+    weighted: float
+    detail: str
+
+
+class SharedTraitFact(BaseModel):
+    trait: str
+    label: str
+    userValue: int
+    bioValue: int
+    gap: int
+    note: str
+
+
+class DifferenceFact(BaseModel):
+    trait: str
+    label: str
+    userValue: int
+    bioValue: int
+    gap: int
+
+
+class ExplanationOut(BaseModel):
+    shared_traits: List[SharedTraitFact]
+    shared_domains: List[str]
+    shared_challenges: List[str]
+    difference: Optional[DifferenceFact]
+    text: str
+
+
+class MatchOut(BaseModel):
     rank: int
     biography: BiographyOut
-    trait_score: float
-    semantic_score: float
-    domain_score: float
-    final_score: float
-    explanation: str
-
-
-class RecommendationOut(BaseModel):
-    rec_id: int
-    method: str
-    items: List[RecItemOut]
+    score: float
+    confidence: float
+    confidence_label: str
+    breakdown: List[BreakdownItemOut]
+    explanation: ExplanationOut
 
 
 class NextQuestion(BaseModel):

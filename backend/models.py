@@ -40,6 +40,11 @@ class Assessment(Base):
     questionnaire_id = Column(Integer, ForeignKey("questionnaires.id"))
     is_adaptive = Column(Boolean, default=False)
     items_asked = Column(Integer, default=0)
+    # user context for the matching engine (Phase 6)
+    life_stage = Column(String(16), nullable=True)     # 18-24, 25-34, ... '55+'
+    career_phase = Column(String(32), nullable=True)   # Student, Early career, ...
+    themes = Column(JSON, nullable=True)               # challenge theme ids, e.g. ["creativity"]
+    goal = Column(Text, nullable=True)                 # free-text goal, feeds S5
 
     questionnaire = relationship("Questionnaire")
     responses = relationship("UserResponse", back_populates="assessment")
@@ -101,6 +106,12 @@ class BiographyProfile(Base):
     domain_tags = Column(JSON)  # e.g. ["leadership", "innovation"]
     birth_year = Column(Integer, nullable=True)
     nationality = Column(String(64), nullable=True)
+    # enriched metadata for the matching engine (Phase 6)
+    themes = Column(JSON, nullable=True)               # derived theme ids
+    challenges = Column(JSON, nullable=True)           # derived challenge ids
+    fame_tier = Column(Integer, nullable=True)         # 1 niche, 2 well-known, 3 household
+    peak_life_stage = Column(String(16), nullable=True)  # early, mid, late
+    source_url = Column(String(256), nullable=True)    # canonical wikipedia URL
 
     items = relationship("RecommendationItem", back_populates="biography")
 

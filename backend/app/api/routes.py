@@ -19,10 +19,12 @@ try:
     )
     from backend.schemas import (
         AssessmentStart, BiographyOut, NextQuestion, ProfileOut,
-        QuestionOut, RecItemOut, RecommendationOut, SubmitAnswers, TraitScores,
+        QuestionOut, MatchOut, SubmitAnswers, TraitScores,
     )
     from backend import scoring
-    from backend.app.services.matching import rank_biographies
+    from backend.app.services import engine as bayes
+    from backend.app.services import matching
+    from backend.app.services import taxonomy
     from backend.app.services.seed_service import ensure_seeded
 except ImportError:
     from database import get_db
@@ -32,10 +34,12 @@ except ImportError:
     )
     from schemas import (
         AssessmentStart, BiographyOut, NextQuestion, ProfileOut,
-        QuestionOut, RecItemOut, RecommendationOut, SubmitAnswers, TraitScores,
+        QuestionOut, MatchOut, SubmitAnswers, TraitScores,
     )
     import scoring
-    from app.services.matching import rank_biographies
+    from app.services import engine as bayes
+    from app.services import matching
+    from app.services import taxonomy
     from app.services.seed_service import ensure_seeded
 
 router = APIRouter(prefix="/api")
@@ -91,6 +95,11 @@ def _bio_out(bio: BiographyProfile) -> BiographyOut:
         domain_tags=bio.domain_tags or [],
         birth_year=bio.birth_year,
         nationality=bio.nationality,
+        themes=bio.themes or [],
+        challenges=bio.challenges or [],
+        fame_tier=bio.fame_tier,
+        peak_life_stage=bio.peak_life_stage,
+        source_url=bio.source_url,
     )
 
 
@@ -162,6 +171,20 @@ def get_questionnaire(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/meta")
+def get_meta():
+    """Frontend bootstrap data (mirrors mockApi.meta)."""
+    return {
+        "themes": taxonomy.THEMES,
+        "life_stages": sorted(VALID_LIFE_STAGES, key=lambda s: {"18-24": 0, "25-34": 1,
+                                                               "35-44": 2, "45-54": 3, "55+": 4}[s]),
+        "career_phases": sorted(VALID_CAREER_PHASES),
+        "challenge_labels": taxonomy.CHALLENGE_LABELS,
+        "quiz_version": "0.4.0",
+        "item_count": 50,
+    }
+
+
 @router.get("/biographies", response_model=list[BiographyOut])
 def list_biographies(
     domain: Optional[str] = Query(default=None),
@@ -185,14 +208,35 @@ def get_biography(slug: str, db: Session = Depends(get_db)):
 # Assessment lifecycle
 # ---------------------------------------------------------------------------
 
+VALID_LIFE_STAGES = {"18-24", "25-34", "35-44", "45-54", "55+"}
+VALID_CAREER_PHASES = {"Student", "Early career", "Mid-career", "Senior / leader", "Career change", "Retired"}
+VALID_THEME_IDS = {t["id"] for t in taxonomy.THEMES}
+
+
 @router.post("/assessments")
 def start_assessment(payload: AssessmentStart, db: Session = Depends(get_db)):
+    # validate optional context (mirrors the mock client's 422 behaviour)
+    if payload.life_stage is not None and payload.life_stage not in VALID_LIFE_STAGES:
+        raise HTTPException(status_code=422, detail="Invalid life stage.")
+    if payload.career_phase is not None and payload.career_phase not in VALID_CAREER_PHASES:
+        raise HTTPException(status_code=422, detail="Invalid career phase.")
+    if payload.themes is not None:
+        if not (1 <= len(payload.themes) <= 3):
+            raise HTTPException(status_code=422, detail="Choose between 1 and 3 challenge themes.")
+        bad = [t for t in payload.themes if t not in VALID_THEME_IDS]
+        if bad:
+            raise HTTPException(status_code=422, detail=f"Unknown theme(s): {bad}")
+
     ensure_seeded(db)  # idempotent
     assessment = Assessment(
         user_id=payload.user_id,
         version=payload.version,
         is_adaptive=payload.adaptive,
         items_asked=0,
+        life_stage=payload.life_stage,
+        career_phase=payload.career_phase,
+        themes=payload.themes,
+        goal=(payload.goal or "").strip() or None,
     )
     db.add(assessment)
     db.commit()
@@ -202,6 +246,12 @@ def start_assessment(payload: AssessmentStart, db: Session = Depends(get_db)):
         "assessment_id": assessment.id,
         "version": assessment.version,
         "is_adaptive": assessment.is_adaptive,
+        "context": {
+            "life_stage": assessment.life_stage,
+            "career_phase": assessment.career_phase,
+            "themes": assessment.themes,
+            "goal": assessment.goal,
+        },
         "questions": [
             QuestionOut(id=q.id, text=q.text, trait=q.trait, reverse=bool(q.reverse))
             for q in questions
@@ -296,13 +346,13 @@ def next_question(
     )
 
 
-@router.post("/assessments/{assessment_id}/recommendations", response_model=RecommendationOut)
+@router.post("/assessments/{assessment_id}/recommendations", response_model=list[MatchOut])
 def recommend(
     assessment_id: int,
     top_k: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    """Rank biographies against the scored profile (v0 trait-distance engine)."""
+    """Phase 5-6 engine: weighted S1-S5 ranking + posterior confidence + MMR."""
     assessment = _get_assessment(db, assessment_id)
     profile = db.query(PersonalityProfile).filter(
         PersonalityProfile.assessment_id == assessment_id
@@ -310,37 +360,48 @@ def recommend(
     if profile is None:
         raise HTTPException(status_code=409, detail="Score the assessment before requesting matches.")
 
-    user_traits = {t: getattr(profile, f"{t}_score") or 50.0 for t in ("O", "C", "E", "A", "N")}
-    biographies = db.query(BiographyProfile).all()
-    ranked = rank_biographies(user_traits, biographies, top_k=top_k)
+    # user context: point estimates + posterior width + stored quiz context
+    traits = {t: getattr(profile, f"{t}_score") or 50.0 for t in ("O", "C", "E", "A", "N")}
+    se = {t: getattr(profile, f"{t}_se") or 0.0 for t in ("O", "C", "E", "A", "N")}
+    answers = _answers_from_db(db, assessment_id)
+    trait_counts = {t: 0 for t in ("O", "C", "E", "A", "N")}
+    for q in db.query(Question).all():
+        if q.trait in trait_counts and q.id in answers:
+            trait_counts[q.trait] += 1
 
-    rec = Recommendation(assessment_id=assessment.id, method="euclid_v0")
+    user = bayes.UserContext(
+        traits=traits,
+        sd=bayes.sd_from_standard_errors(se, len(answers), trait_counts),
+        themes=assessment.themes or [],
+        goal=assessment.goal or "",
+        era=taxonomy.era_from_life_stage(assessment.life_stage or "25-34"),
+    )
+
+    biographies = db.query(BiographyProfile).all()
+    matches = matching.matches_block(user, biographies)[:top_k]
+
+    # persist the ranked result under the assessment
+    rec = Recommendation(assessment_id=assessment.id, method="weighted_v1")
     db.add(rec)
     db.flush()
-
-    items = []
-    for rank, (bio, scores) in enumerate(ranked, start=1):
-        item = RecommendationItem(
-            rec_id=rec.id,
-            profile_id=bio.id,
-            rank=rank,
-            trait_score=scores["trait_score"],
-            semantic_score=scores["semantic_score"],
-            domain_score=scores["domain_score"],
-            final_score=scores["final_score"],
-            explanation=scores["explanation"],
-        )
-        db.add(item)
-        items.append(
-            RecItemOut(
-                rank=rank,
-                biography=_bio_out(bio),
-                trait_score=scores["trait_score"],
-                semantic_score=scores["semantic_score"],
-                domain_score=scores["domain_score"],
-                final_score=scores["final_score"],
-                explanation=scores["explanation"],
+    for m in matches:
+        bio = m["biography"]
+        s = {b["key"]: b["weighted"] for b in m["breakdown"]}
+        db.add(
+            RecommendationItem(
+                rec_id=rec.id,
+                profile_id=bio.id,
+                rank=m["rank"],
+                trait_score=s["S1"],
+                semantic_score=s["S5"],
+                domain_score=s["S3"],
+                final_score=m["score"],
+                explanation=m["explanation"]["text"],
             )
         )
     db.commit()
-    return RecommendationOut(rec_id=rec.id, method=rec.method, items=items)
+
+    # serialize through the pydantic contract
+    for m in matches:
+        m["biography"] = _bio_out(m["biography"])
+    return matches

@@ -8,10 +8,12 @@ try:
     from backend.models import Question, Questionnaire, BiographyProfile
     from backend.questionnaire import IPIP50_ITEMS
     from backend.seed import BIographies as BIOGRAPHIES
+    from backend.app.services import taxonomy
 except ImportError:
     from models import Question, Questionnaire, BiographyProfile
     from questionnaire import IPIP50_ITEMS
     from seed import BIographies as BIOGRAPHIES
+    from app.services import taxonomy
 
 
 def seed_questions(db: Session) -> int:
@@ -48,12 +50,16 @@ def seed_biographies(db: Session) -> int:
         return db.query(BiographyProfile).count()
 
     for bio in BIOGRAPHIES:
+        tags = bio.get("domain_tags", [])
+        summary = bio["summary"]
+        name = bio["name"]
+        fame, peak = taxonomy.FAME_OVERRIDES.get(name, (2, "mid"))
         db.add(
             BiographyProfile(
-                name=bio["name"],
+                name=name,
                 slug=bio["slug"],
                 domain=bio["domain"],
-                summary=bio["summary"],
+                summary=summary,
                 O_score=bio["O"],
                 C_score=bio["C"],
                 E_score=bio["E"],
@@ -61,9 +67,14 @@ def seed_biographies(db: Session) -> int:
                 N_score=bio["N"],
                 trait_source=bio.get("trait_source", "manual"),
                 trait_confidence=bio.get("trait_confidence", 1.0),
-                domain_tags=bio.get("domain_tags", []),
+                domain_tags=tags,
                 birth_year=bio.get("birth_year"),
                 nationality=bio.get("nationality"),
+                themes=taxonomy.derive_themes(summary, tags),
+                challenges=taxonomy.derive_challenges(summary, tags),
+                fame_tier=fame,
+                peak_life_stage=peak,
+                source_url=taxonomy.wikipedia_url(name),
             )
         )
     db.commit()
