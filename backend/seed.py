@@ -353,4 +353,11 @@ BIographies = [
      "trait_source": "manual", "trait_confidence": 0.7, "domain_tags": ["justice", "education", "legacy"],
      "birth_year": 1990, "nationality": "South African"},
     {"name": "Ai Weiwei", "slug": "ai-weiwei", "domain": "activism",
-     "summary": "Chinese artist and dissident whose work challenges authority and social norms.",}}    
+     "summary": "Chinese artist and dissident whose work challenges authority and social norms.",
+     "O": 85, "C": 70, "E": 60, "A": 65, "N": 50,
+     "trait_source": "manual", "trait_confidence": 0.8, "domain_tags": ["art", "dissent", "freedom"],
+     "birth_year": 1957, "nationality": "Chinese"},
+]
+
+# Normalize the casing alias so other modules can use a conventional name.
+BIographies = BIographies  # keep original export name (imported by seed_service)

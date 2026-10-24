@@ -18,8 +18,6 @@ class Questionnaire(Base):
     item_order = Column(JSON)  # list of question ids in order
     description = Column(Text)
 
-    responses = relationship("UserResponse", back_populates="questionnaire")
-
 
 class Question(Base):
     __tablename__ = "questions"

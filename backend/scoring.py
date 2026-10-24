@@ -2,7 +2,10 @@
 from typing import Dict, List, Tuple
 import math
 
-from questionnaire import IPIP50_ITEMS, TRAIT_ITEMS
+try:
+    from backend.questionnaire import IPIP50_ITEMS, TRAIT_ITEMS
+except ImportError:  # when backend/ itself is on sys.path
+    from questionnaire import IPIP50_ITEMS, TRAIT_ITEMS
 
 TRAIT_NAMES = ["O", "C", "E", "A", "N"]
 TRAIT_FULL = {
