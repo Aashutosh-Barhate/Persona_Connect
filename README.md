@@ -217,7 +217,7 @@ curl http://127.0.0.1:8000/healthz
 | 4 | **FastAPI backend stood up**: main.py, /api routes, idempotent seeding, v0 trait matching; fixed broken `Questionnaire.responses` relationship (NoForeignKeys crash) and repaired the truncated seed.py (67 bios now load); smoke-tested end-to-end incl. error paths | ✅ |
 | 5 | **Bayesian engine**: per-trait posterior sd from stored SEs, deterministic 30-draw posterior sampling, top-5-share confidence, adaptive stopping rules | ✅ |
 | 6 | **Matching**: S1–S5 weighted engines ported 1:1 from mock, MMR re-ranking with domain cap + fame diversity, fact-only explanations; `/recommendations` upgraded to `weighted_v1`; migration 0002 (assessment context + bio facets); taxonomy port; hooks into start/submit/recommend | ✅ |
-| 7 | **Frontend↔backend wiring** (this commit): per-item answer/undo, resume, history, feedback backend parity routes; realApi fetch client mirroring mockApi's exact signatures; `VITE_API_BASE` behaviour switch in `client.ts`; env-based, zero-break for mock mode | ✅ |
+| 7 | **Frontend↔backend wiring**: per-item answer/undo, resume, history, feedback backend parity routes (+ migration 0003_feedback); realApi fetch client mirroring mockApi's exact signatures; `VITE_API_BASE` behaviour switch in `client.ts`; pages re-wired; mock mode stays default | ✅ |
 | 8 | Evaluation of engines (correlate weighted_v1 vs mock outputs; hold-out weighting experiments) | ⏳ next |
 | 9 | Deploy (production CORS origins, persistent host, vector/embedding roadmap) | ⏳ planned |
 
