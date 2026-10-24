@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowRight, Loader2, RotateCcw } from 'lucide-react'
-import { mockApi, ANSWER_OPTIONS } from '../api/mockApi'
+import { api, ANSWER_OPTIONS } from '../api/client'
 import { useAsync } from '../hooks/useAsync'
 import ConfidenceMeter from '../components/ConfidenceMeter'
 import Skeleton from '../components/Skeleton'
@@ -14,7 +14,7 @@ export default function QuizPage() {
   const [submitting, setSubmitting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const resume = useAsync<NextItemResponse>(() => mockApi.resumeQuiz(sessionId!), [sessionId])
+  const resume = useAsync<NextItemResponse>(() => api.resumeQuiz(sessionId!), [sessionId])
 
   useEffect(() => {
     if (resume.data) setState(resume.data)
@@ -26,7 +26,7 @@ export default function QuizPage() {
       setSubmitting(true)
       setActionError(null)
       try {
-        const next = await mockApi.answer(sessionId, state.item.id, value)
+        const next = await api.answer(sessionId, state.item.id, value)
         setState(next)
       } catch (err) {
         setActionError(err instanceof Error ? err.message : 'Could not record that answer.')
@@ -42,7 +42,7 @@ export default function QuizPage() {
     setSubmitting(true)
     setActionError(null)
     try {
-      const next = await mockApi.undo(sessionId)
+      const next = await api.undo(sessionId)
       setState(next)
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Could not undo.')

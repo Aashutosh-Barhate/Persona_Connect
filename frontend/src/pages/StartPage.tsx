@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowRight, Loader2 } from 'lucide-react'
-import { mockApi } from '../api/mockApi'
+import { api } from '../api/client'
 import type { ThemeOption } from '../types'
 
 export default function StartPage() {
@@ -39,7 +39,7 @@ export default function StartPage() {
 
     setSubmitting(true)
     try {
-      const response = await mockApi.startQuiz({ ageRange, careerPhase, themes, goal })
+      const response = await api.startQuiz({ ageRange, careerPhase, themes, goal })
       navigate(`/quiz/${response.sessionId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not start the quiz.')
@@ -61,7 +61,7 @@ export default function StartPage() {
         <fieldset>
           <legend className="label">Age range</legend>
           <div className="flex flex-wrap gap-2">
-            {mockApi.meta.lifeStages.map((stage) => (
+            {api.meta.lifeStages.map((stage) => (
               <button
                 key={stage}
                 type="button"
@@ -82,7 +82,7 @@ export default function StartPage() {
         <fieldset>
           <legend className="label">Career phase</legend>
           <div className="flex flex-wrap gap-2">
-            {mockApi.meta.careerPhases.map((phase) => (
+            {api.meta.careerPhases.map((phase) => (
               <button
                 key={phase}
                 type="button"
@@ -105,7 +105,7 @@ export default function StartPage() {
             What are you working on right now? <span className="font-normal text-slate-500">(pick up to 3)</span>
           </legend>
           <div className="grid gap-2 sm:grid-cols-2">
-            {mockApi.meta.themes.map((theme) => {
+            {api.meta.themes.map((theme) => {
               const active = themes.includes(theme.id)
               return (
                 <button

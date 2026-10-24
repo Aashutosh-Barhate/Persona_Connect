@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { Trash2 } from 'lucide-react'
-import { listHistory, openSession } from '../api/mockApi'
+import { listHistory, openSession } from '../api/client'
 import { useAsync } from '../hooks/useAsync'
 import { themeLabel } from '../data/mockData'
 import type { HistoryEntry } from '../types'

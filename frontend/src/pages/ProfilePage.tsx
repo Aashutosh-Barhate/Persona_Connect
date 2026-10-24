@@ -7,8 +7,8 @@ import {
   RadarChart,
   ResponsiveContainer,
 } from 'recharts'
-import { mockApi, TRAIT_BLURB, TRAIT_LABELS, TRAIT_ORDER, mbtiType } from '../api/mockApi'
-import { getCurrentSessionId } from '../api/mockApi'
+import { api, TRAIT_BLURB, TRAIT_LABELS, TRAIT_ORDER, mbtiType } from '../api/client'
+import { getCurrentSessionId } from '../api/client'
 import { useAsync } from '../hooks/useAsync'
 import TraitRangeBar from '../components/TraitRangeBar'
 import Disclosure from '../components/Disclosure'
@@ -19,7 +19,7 @@ export default function ProfilePage() {
   const navigate = useNavigate()
   const sessionId = getCurrentSessionId()
 
-  const profile = useAsync(() => mockApi.getProfile(sessionId!), [sessionId])
+  const profile = useAsync(() => api.getProfile(sessionId!), [sessionId])
 
   if (!sessionId) {
     return (

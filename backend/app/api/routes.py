@@ -9,12 +9,13 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 try:
     from backend.database import get_db
     from backend.models import (
-        Assessment, BiographyProfile, PersonalityProfile, Question,
+        Assessment, BiographyProfile, Feedback, PersonalityProfile, Question,
         Questionnaire, Recommendation, RecommendationItem, UserResponse,
     )
     from backend.schemas import (
@@ -29,7 +30,7 @@ try:
 except ImportError:
     from database import get_db
     from models import (
-        Assessment, BiographyProfile, PersonalityProfile, Question,
+        Assessment, BiographyProfile, Feedback, PersonalityProfile, Question,
         Questionnaire, Recommendation, RecommendationItem, UserResponse,
     )
     from schemas import (
@@ -41,6 +42,19 @@ except ImportError:
     from app.services import matching
     from app.services import taxonomy
     from app.services.seed_service import ensure_seeded
+
+
+class AnswerIn(BaseModel):
+    question_id: int
+    value: int
+
+
+class FeedbackIn(BaseModel):
+    assessment_id: int
+    biography_id: int
+    rating: int
+    comment: Optional[str] = None
+    breakdown: Optional[list] = None
 
 router = APIRouter(prefix="/api")
 
@@ -327,10 +341,11 @@ def next_question(
     if not assessment.is_adaptive or not asked_ids:
         nxt = remaining[0]
     else:
-        scores, ses = scoring.score_partial(answers)
+        _, ses = scoring.score_partial(answers)
         # highest uncertainty trait first, fewest answered as tie-break
         trait_order = sorted(ses, key=lambda t: (-ses[t], sum(
             1 for q in all_questions if q.trait == t and q.id in asked_ids)))
+        nxt = None
         for trait in trait_order:
             nxt = next((q for q in remaining if q.trait == trait), None)
             if nxt:
@@ -344,6 +359,192 @@ def next_question(
         items_asked=len(asked_ids),
         estimated_remaining=len(remaining) - 1,
     )
+
+
+# ---------------------------------------------------------------------------
+# Parity routes for the frontend client (per-item answer / undo / resume /
+# history / feedback), mirroring mockApi's function surface.
+# ---------------------------------------------------------------------------
+
+def _quiz_state(db: Session, assessment_id: int) -> dict:
+    """Full next-item state for the client (mockApi NextItemResponse shape)."""
+    assessment = _get_assessment(db, assessment_id)
+    answers = _answers_from_db(db, assessment_id)
+    asked_ids = set(answers)
+
+    all_questions = db.query(Question).order_by(Question.id).all()
+    remaining = [q for q in all_questions if q.id not in asked_ids]
+
+    trait_counts = {t: 0 for t in ("O", "C", "E", "A", "N")}
+    for q in all_questions:
+        if q.id in asked_ids:
+            trait_counts[q.trait] += 1
+
+    # analytic posterior width per trait (mock parity: max(7, 12/sqrt(n))); 15
+    # until any answer exists for the trait
+    trait_sd = {
+        t: (bayes.SD_MAX if trait_counts[t] == 0
+            else max(bayes.SD_TARGET, round(12.0 / math.sqrt(trait_counts[t]) * 10) / 10))
+        for t in trait_counts
+    }
+    confidence = bayes.overall_confidence(trait_sd)
+    done = bayes.quiz_done(len(asked_ids), trait_counts) or not remaining
+
+    item = None
+    if not done:
+        if not assessment.is_adaptive or not asked_ids:
+            nxt = remaining[0]
+        else:
+            _, ses = scoring.score_partial(answers)
+            trait_order = sorted(ses, key=lambda t: (-ses[t], trait_counts[t]))
+            nxt = None
+            for trait in trait_order:
+                nxt = next((q for q in remaining if q.trait == trait), None)
+                if nxt:
+                    break
+        item = QuestionOut(id=nxt.id, text=nxt.text, trait=nxt.trait, reverse=bool(nxt.reverse))
+
+    return {
+        "sessionId": str(assessment_id),
+        "item": item,
+        "done": bool(done),
+        "answeredCount": len(asked_ids),
+        "confidence": confidence,
+        "traitSd": trait_sd,
+    }
+
+
+def _apply_profile(db: Session, assessment_id: int, answers: dict, complete: bool = False) -> None:
+    """Recompute + upsert the personality profile for the current answers.
+
+    Completeness is derived from the answer count: full-50 scoring requires all
+    questions answered; the adaptive-stopping `done` flag still yields a
+    partial (but confident) score.
+    """
+    total = db.query(Question).count()
+    fully_answered = len(answers) >= total
+    if fully_answered:
+        scores = scoring.score_assessment(answers)
+        ses = {t: 0.0 for t in scores}
+        assessment = _get_assessment(db, assessment_id)
+        assessment.completed_at = assessment.completed_at or datetime.utcnow()
+    else:
+        scores, ses = scoring.score_partial(answers)
+
+    profile = db.query(PersonalityProfile).filter(
+        PersonalityProfile.assessment_id == assessment_id
+    ).first()
+    if profile is None:
+        profile = PersonalityProfile(assessment_id=assessment_id)
+        db.add(profile)
+    profile.O_score, profile.C_score, profile.E_score = scores["O"], scores["C"], scores["E"]
+    profile.A_score, profile.N_score = scores["A"], scores["N"]
+    profile.O_se, profile.C_se, profile.E_se = ses["O"], ses["C"], ses["E"]
+    profile.A_se, profile.N_se = ses["A"], ses["N"]
+    profile.mbti = scoring.trait_to_mbti(scores)
+    profile.scoring_version = "1.0"
+    _get_assessment(db, assessment_id).items_asked = len(answers)
+    db.commit()
+
+
+@router.post("/assessments/{assessment_id}/answers")
+def answer_item(assessment_id: int, payload: AnswerIn, db: Session = Depends(get_db)):
+    """Upsert one answer and return the next state (mockApi.answer parity)."""
+    _get_assessment(db, assessment_id)
+    q = db.get(Question, payload.question_id)
+    if q is None:
+        raise HTTPException(status_code=400, detail="Unknown quiz item.")
+    if not (1 <= payload.value <= 5):
+        raise HTTPException(status_code=422, detail="Answers must be integers between 1 and 5.")
+
+    answers = _answers_from_db(db, assessment_id)
+    answers[payload.question_id] = payload.value  # upsert
+    _store_responses(db, assessment_id, {payload.question_id: payload.value})
+
+    trait_counts = {t: 0 for t in ("O", "C", "E", "A", "N")}
+    for qq in db.query(Question).all():
+        if qq.id in answers:
+            trait_counts[qq.trait] += 1
+    done = bayes.quiz_done(len(answers), trait_counts)
+    _apply_profile(db, assessment_id, answers, complete=done)
+
+    return _quiz_state(db, assessment_id)
+
+
+@router.post("/assessments/{assessment_id}/undo")
+def undo_item(assessment_id: int, db: Session = Depends(get_db)):
+    """Undo the most recent answer and return the next state (mockApi.undo parity)."""
+    assessment = _get_assessment(db, assessment_id)
+    last = (
+        db.query(UserResponse)
+        .filter(UserResponse.assessment_id == assessment_id)
+        .order_by(UserResponse.answered_at.desc(), UserResponse.id.desc())
+        .first()
+    )
+    if last is not None:
+        db.delete(last)
+        db.commit()
+
+    answers = _answers_from_db(db, assessment_id)
+    _apply_profile(db, assessment_id, answers, complete=False)
+    return _quiz_state(db, assessment_id)
+
+
+@router.get("/assessments/{assessment_id}/state")
+def get_state(assessment_id: int, db: Session = Depends(get_db)):
+    """Resume: rebuild the next-item state from stored responses."""
+    return _quiz_state(db, assessment_id)
+
+
+@router.get("/history")
+def list_history(
+    user_id: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+):
+    """Past assessments (newest first), mockApi.listHistory parity shape."""
+    query = db.query(Assessment)
+    if user_id is not None:
+        query = query.filter(Assessment.user_id == user_id)
+    assessments = query.order_by(Assessment.started_at.desc()).limit(50).all()
+    return [
+        {
+            "sessionId": str(a.id),
+            "createdAt": a.started_at.isoformat() if a.started_at else None,
+            "answeredCount": a.items_asked or 0,
+            "lifeStage": a.life_stage or "",
+            "careerPhase": a.career_phase or "",
+            "themes": a.themes or [],
+            "assessmentId": a.id,
+            "isAdaptive": bool(a.is_adaptive),
+        }
+        for a in assessments
+    ]
+
+
+@router.post("/feedback")
+def submit_feedback(payload: FeedbackIn, db: Session = Depends(get_db)):
+    """Rating (1-5) for one (assessment, biography) pair; mockApi.submitFeedback parity."""
+    if not (1 <= payload.rating <= 5):
+        raise HTTPException(status_code=422, detail="Rating must be an integer between 1 and 5.")
+    assessment = db.get(Assessment, payload.assessment_id)
+    if assessment is None:
+        raise HTTPException(status_code=404, detail="Assessment not found.")
+    if payload.biography_id is not None:
+        bio = db.get(BiographyProfile, payload.biography_id)
+        if bio is None:
+            raise HTTPException(status_code=404, detail="Biography not found.")
+
+    db.add(
+        Feedback(
+            assessment_id=payload.assessment_id,
+            biography_id=payload.biography_id,
+            rating=payload.rating,
+            comment=payload.comment,
+            breakdown=payload.breakdown,
+        )
+    )
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/assessments/{assessment_id}/recommendations", response_model=list[MatchOut])

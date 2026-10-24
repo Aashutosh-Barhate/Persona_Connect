@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ExternalLink, Flag, MessageSquareQuote } from 'lucide-react'
-import { mockApi, TRAIT_LABELS, TRAIT_ORDER, getCurrentSessionId } from '../api/mockApi'
+import { api, TRAIT_LABELS, TRAIT_ORDER, getCurrentSessionId } from '../api/client'
 import { useAsync } from '../hooks/useAsync'
 import TraitRangeBar from '../components/TraitRangeBar'
 import ScoreBreakdown from '../components/ScoreBreakdown'
@@ -16,11 +16,11 @@ export default function MatchDetailPage() {
   const sessionId = getCurrentSessionId()
 
   const matches = useAsync<Match[]>(
-    () => mockApi.getMatches(sessionId!),
+    () => api.getMatches(sessionId!),
     [sessionId],
   )
 
-  const profile = useAsync(() => mockApi.getProfile(sessionId!), [sessionId])
+  const profile = useAsync(() => api.getProfile(sessionId!), [sessionId])
 
   if (!sessionId) {
     return (
@@ -201,7 +201,7 @@ export default function MatchDetailPage() {
         <RatingForm
           biographyName={biography.name}
           onSubmit={async (rating, comment) => {
-            await mockApi.submitFeedback({
+            await api.submitFeedback({
               sessionId,
               biographyId: biography.id,
               rating,

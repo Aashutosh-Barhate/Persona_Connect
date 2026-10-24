@@ -154,3 +154,15 @@ class Consent(Base):
     purpose = Column(String(128))
     granted = Column(Boolean, default=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
+
+
+class Feedback(Base):
+    """Post-match user rating for one (assessment, biography) pair."""
+    __tablename__ = "feedback"
+    id = Column(Integer, primary_key=True, index=True)
+    assessment_id = Column(Integer, ForeignKey("assessments.id"), index=True)
+    biography_id = Column(Integer, ForeignKey("biography_profiles.id"))
+    rating = Column(Integer, nullable=False)  # 1-5
+    comment = Column(Text)
+    breakdown = Column(JSON)  # S1-S5 weighted contributions at request time
+    created_at = Column(DateTime, default=datetime.utcnow)

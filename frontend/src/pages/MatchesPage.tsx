@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { mockApi, getCurrentSessionId } from '../api/mockApi'
+import { api, getCurrentSessionId } from '../api/client'
 import { useAsync } from '../hooks/useAsync'
 import MatchCard from '../components/MatchCard'
 import Disclosure from '../components/Disclosure'
@@ -14,7 +14,7 @@ export default function MatchesPage() {
   const sessionId = getCurrentSessionId()
   const [expanded, setExpanded] = useState(false)
 
-  const matches = useAsync<Match[]>(() => mockApi.getMatches(sessionId!), [sessionId])
+  const matches = useAsync<Match[]>(() => api.getMatches(sessionId!), [sessionId])
 
   if (!sessionId) {
     return (
