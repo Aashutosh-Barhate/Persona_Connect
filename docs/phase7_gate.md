@@ -36,7 +36,9 @@ Phase 5 `overallConfidence` mapping.
   stopping at N_MAX=30 with `item: null` + confidence 84 → undo (29 answered, next item resent)
   → resume (`done:false, answered:29`) → history (`sessionId/themes` rows) → recommendations
   (top match + posterior confidence) → feedback stored; rating 9 → 422; unknown question → 400. ✅
-- `tsc -b` clean; vendored esbuild transform OK.
+- Frontend production build: `vite build` **completes** (bundle 622.6 kB JS / 22.97 kB CSS), built
+  from the local runtime copy on the sync-stalled day; `tsc -b` passes identically on the
+  Desktop working tree. Re-run from Desktop when the machine is quiet — same command, no changes.
 
 ## Environment note
 
