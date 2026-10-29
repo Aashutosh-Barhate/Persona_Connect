@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight, Share2 } from 'lucide-react'
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -13,13 +14,17 @@ import { useAsync } from '../hooks/useAsync'
 import TraitRangeBar from '../components/TraitRangeBar'
 import Disclosure from '../components/Disclosure'
 import Skeleton from '../components/Skeleton'
+import ShareCardModal from '../components/ShareCardModal'
 import { themeLabel } from '../data/mockData'
+import type { Match } from '../types'
 
 export default function ProfilePage() {
   const navigate = useNavigate()
   const sessionId = getCurrentSessionId()
+  const [shareModalOpen, setShareModalOpen] = useState(false)
 
   const profile = useAsync(() => api.getProfile(sessionId!), [sessionId])
+  const matches = useAsync<Match[]>(() => api.getMatches(sessionId!), [sessionId])
 
   if (!sessionId) {
     return (
@@ -66,13 +71,24 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-8">
-      <header>
-        <h1 className="text-3xl font-extrabold tracking-tight">Your profile</h1>
-        <p className="mt-2 text-slate-400">
-          Five trait bands and four preference sliders, from {data.answeredCount} answers (quiz
-          version {data.quizVersion}). Bands show the estimate and its uncertainty - read the edges,
-          not the middle.
-        </p>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight">Your profile</h1>
+          <p className="mt-2 max-w-2xl text-slate-400">
+            Five trait bands and four preference sliders, from {data.answeredCount} answers (quiz
+            version {data.quizVersion}). Bands show the estimate and its uncertainty - read the edges,
+            not the middle.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn-ghost flex shrink-0 items-center gap-2 self-start border-slate-700 hover:border-indigo-500"
+          onClick={() => setShareModalOpen(true)}
+          aria-label="Create shareable card"
+        >
+          <Share2 className="h-4 w-4 text-indigo-400" />
+          <span>Share Profile Card</span>
+        </button>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -172,6 +188,14 @@ export default function ProfilePage() {
       </div>
 
       <Disclosure />
+
+      {/* Share Card Modal */}
+      <ShareCardModal
+        isOpen={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        matches={matches.data || []}
+        profile={profile.data}
+      />
     </div>
   )
 }

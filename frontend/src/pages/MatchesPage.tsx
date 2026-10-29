@@ -5,7 +5,9 @@ import { useAsync } from '../hooks/useAsync'
 import MatchCard from '../components/MatchCard'
 import Disclosure from '../components/Disclosure'
 import { SkeletonCard } from '../components/Skeleton'
-import type { Match } from '../types'
+import ShareCardModal from '../components/ShareCardModal'
+import type { Match, Profile } from '../types'
+import { Share2 } from 'lucide-react'
 
 const INITIAL_COUNT = 5
 
@@ -13,8 +15,10 @@ export default function MatchesPage() {
   const navigate = useNavigate()
   const sessionId = getCurrentSessionId()
   const [expanded, setExpanded] = useState(false)
+  const [shareModalOpen, setShareModalOpen] = useState(false)
 
   const matches = useAsync<Match[]>(() => api.getMatches(sessionId!), [sessionId])
+  const profile = useAsync<Profile>(() => api.getProfile(sessionId!), [sessionId])
 
   if (!sessionId) {
     return (
@@ -30,13 +34,26 @@ export default function MatchesPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-3xl font-extrabold tracking-tight">Your role models</h1>
-        <p className="mt-2 max-w-2xl text-slate-400">
-          Five picks from twenty candidates, re-ranked for diversity (at most two per domain, at
-          least one outside the most-famous tier). Confidence comes from how often each person stays
-          in your top five when your quiz answers are re-sampled.
-        </p>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight">Your role models</h1>
+          <p className="mt-2 max-w-2xl text-slate-400">
+            Five picks from twenty candidates, re-ranked for diversity (at most two per domain, at
+            least one outside the most-famous tier). Confidence comes from how often each person stays
+            in your top five when your quiz answers are re-sampled.
+          </p>
+        </div>
+        {matches.data && matches.data.length > 0 && (
+          <button
+            type="button"
+            className="btn-ghost flex shrink-0 items-center gap-2 self-start border-slate-700 hover:border-indigo-500"
+            onClick={() => setShareModalOpen(true)}
+            aria-label="Create shareable card"
+          >
+            <Share2 className="h-4 w-4 text-indigo-400" aria-hidden="true" />
+            <span>Share Card</span>
+          </button>
+        )}
       </header>
 
       <Disclosure />
@@ -84,6 +101,14 @@ export default function MatchesPage() {
           </p>
         </>
       )}
+
+      {/* Share Card Modal */}
+      <ShareCardModal
+        isOpen={shareModalOpen}
+        onClose={() => setShareModalOpen(false)}
+        matches={matches.data || []}
+        profile={profile.data}
+      />
     </div>
   )
 }
