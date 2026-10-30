@@ -223,7 +223,7 @@ curl http://127.0.0.1:8000/healthz
 | 6 | **Matching**: S1–S5 weighted engines ported 1:1 from mock, MMR re-ranking with domain cap + fame diversity, fact-only explanations; `/recommendations` upgraded to `weighted_v1`; migration 0002 (assessment context + bio facets); taxonomy port; hooks into start/submit/recommend | ✅ |
 | 7 | **Frontend↔backend wiring**: per-item answer/undo, resume, history, feedback backend parity routes (+ migration 0003_feedback); realApi fetch client mirroring mockApi's exact signatures; `VITE_API_BASE` behaviour switch in `client.ts`; pages re-wired; mock mode stays default | ✅ |
 | 8 | **Evaluation**: exact parity harness (S1–S5 + weighted total, max err 0.0 after fixing 2 real divergences: tokenizer + theme-separator); leverage/redundancy/weight-sensitivity report (`docs/phase8_validation.md`); selection invariants (MMR cap, fame diversity, determinism, self-match rank 1) | ✅ |
-| 9 | Deploy (production CORS origins, persistent host, push `main`) | ⏳ next |
+| 9 | **Deploy**: partial — Capacitor native shell (android/ wrapper, `cap:sync`/`cap:android`/`cap:ios` scripts), env-overridable `CORS_ORIGINS` committed; remaining: production host + push of `main` | 🔶 in progress |
 
 ---
 
@@ -239,6 +239,19 @@ curl http://127.0.0.1:8000/healthz
   recommendation output auditable.
 - **Privacy posture:** results store only a bare `user_id` string and assessment
   metadata — no emails, names, or other PII; feedback links by assessment id.
+
+## Evaluation
+
+Engine parity and structural validation live in `tests/`:
+
+```bash
+python tests/phase8_parity.py     # S1–S5 + weighted total vs. mock formulas (must be exact)
+python tests/phase8_validate.py   # regenerates docs/phase8_validation.md
+```
+
+Current facts (30 users × 67 bios): parity max err 0.0 · r(S1,S2)=0.71 (redundant
+pair, keep S2 low-weighted) · S1-only rankings drop to 11% top-5 overlap ·
+self-match always ranks its twin #1 · MMR caps + fame diversity verified.
 
 ## Roadmap
 
