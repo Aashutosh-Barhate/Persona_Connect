@@ -22,3 +22,6 @@ dist/
 # Environment
 .env
 .env.local
+
+# Capacitor machine-specific paths
+frontend/android/local.properties
