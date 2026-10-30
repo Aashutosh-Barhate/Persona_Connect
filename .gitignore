@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# macOS noise
+.DS_Store
+http_cache*.sqlite
+
+# sync duplicates (iCloud "filename 2" copies)
+.duplicates/
+*" 2"*
+*" 2".*
+* 2.*
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local

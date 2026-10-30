@@ -26,13 +26,27 @@ app = FastAPI(
     ),
 )
 
+# Browser dev origins + Capacitor native-app WebView origins.
+# Override in production with CORS_ORIGINS="https://a.com,https://b.com".
+import os as _os
+
+_cors_origins = _os.environ.get(
+    "CORS_ORIGINS",
+    ",".join(
+        [
+            "http://localhost:5173",     # Vite dev server
+            "http://localhost:4173",     # Vite preview
+            "http://localhost:3000",
+            "capacitor://localhost",     # Capacitor iOS WebView
+            "http://localhost",          # Capacitor Android WebView
+            "https://localhost",         # Capacitor Android (androidScheme=https)
+        ]
+    ).split(","),
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",   # Vite dev server
-        "http://localhost:4173",   # Vite preview
-        "http://localhost:3000",
-    ],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
