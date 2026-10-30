@@ -188,10 +188,14 @@ curl http://127.0.0.1:8000/healthz
 | GET  | `/api/biographies/{slug}` | one biography, enriched |
 | POST | `/api/assessments` | start quiz (user validation; nullable context) |
 | POST | `/api/assessments/{id}/submit` | batch submit (full or partial) → `ProfileOut` |
+| POST | `/api/assessments/{id}/answers` | single-item upsert → next state (quiz page) |
+| POST | `/api/assessments/{id}/undo` | remove last answer → next state |
 | GET  | `/api/assessments/{id}/profile` | stored profile |
+| GET  | `/api/assessments/{id}/state` | resume: next-item state from stored responses |
 | POST | `/api/assessments/{id}/next` | adaptive next item |
 | POST | `/api/assessments/{id}/recommendations` | full match list (weighted_v1) |
 | GET  | `/api/history?user_id=` | past assessments for a user |
+| POST | `/api/feedback` | rating (1-5) + comment for one assessment×bio |
 
 ---
 
@@ -218,8 +222,8 @@ curl http://127.0.0.1:8000/healthz
 | 5 | **Bayesian engine**: per-trait posterior sd from stored SEs, deterministic 30-draw posterior sampling, top-5-share confidence, adaptive stopping rules | ✅ |
 | 6 | **Matching**: S1–S5 weighted engines ported 1:1 from mock, MMR re-ranking with domain cap + fame diversity, fact-only explanations; `/recommendations` upgraded to `weighted_v1`; migration 0002 (assessment context + bio facets); taxonomy port; hooks into start/submit/recommend | ✅ |
 | 7 | **Frontend↔backend wiring**: per-item answer/undo, resume, history, feedback backend parity routes (+ migration 0003_feedback); realApi fetch client mirroring mockApi's exact signatures; `VITE_API_BASE` behaviour switch in `client.ts`; pages re-wired; mock mode stays default | ✅ |
-| 8 | Evaluation of engines (correlate weighted_v1 vs mock outputs; hold-out weighting experiments) | ⏳ next |
-| 9 | Deploy (production CORS origins, persistent host, vector/embedding roadmap) | ⏳ planned |
+| 8 | **Evaluation**: exact parity harness (S1–S5 + weighted total, max err 0.0 after fixing 2 real divergences: tokenizer + theme-separator); leverage/redundancy/weight-sensitivity report (`docs/phase8_validation.md`); selection invariants (MMR cap, fame diversity, determinism, self-match rank 1) | ✅ |
+| 9 | Deploy (production CORS origins, persistent host, push `main`) | ⏳ next |
 
 ---
 
@@ -244,6 +248,38 @@ curl http://127.0.0.1:8000/healthz
 - [ ] Feedback loop into match weights (rating-weighted re-ranking)
 - [ ] CI: pytest for scoring + engine parity vs. mock formulas
 - [ ] Phase 9 deployment (production CORS, persistent host, vector/embedding roadmap)
+
+## Native mobile app (Capacitor)
+
+The frontend is wrapped as a native Android/iOS app with Capacitor — the React
+code is unchanged; Capacitor packages `dist/` into a native WebView shell.
+
+```bash
+# 1. Build the web bundle, pointing the app at a backend the phone can reach
+#    (your machine's LAN IP — localhost is unreachable from a device):
+VITE_API_BASE=http://<your-lan-ip>:8000 npm run build
+
+# 2. Sync the bundle into the native projects:
+npx cap sync
+
+# 3. Open in the native IDE and build from there (first time: `cap add` runs):
+npm run cap:open:android   # Android Studio -> Build APK
+npm run cap:open:ios       # Xcode (requires full Xcode, not just CLT)
+```
+
+Backend must listen on all interfaces for device access:
+
+```bash
+.venv/bin/uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+```
+
+- CORS already allows the Capacitor WebView origins (`capacitor://localhost`,
+  `http://localhost`, `https://localhost`); production origins can be injected
+  via `CORS_ORIGINS="https://a.com,..."`.
+- Building without `VITE_API_BASE` produces an offline-capable app in mock mode
+  (the client.ts switch is compile-time).
+- First-time native setup: Android Studio is required to produce the APK
+  (`cap add android` has already been run; the `android/` project is committed).
 
 ## Project history
 

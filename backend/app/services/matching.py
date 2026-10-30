@@ -16,6 +16,7 @@ one pick outside the top fame tier must appear in the top 5.
 This module supersedes the Phase 4 euclid_v0 scorer.
 """
 import math
+import re
 
 from backend.app.services import taxonomy
 from backend.app.services.engine import UserContext, TRAITS
@@ -98,17 +99,21 @@ def _jaccard(a: list, b: list) -> float:
     return len(sa & sb) / len(sa | sb)
 
 
+_TOKEN_RE = re.compile(r"[a-z0-9]+")
+
+
 def _tokenize(text: str) -> set:
-    tokens = set()
-    for token in text.lower().split():
-        cleaned = "".join(ch for ch in token if ch.isalnum())
-        if len(cleaned) > 2 and cleaned not in STOPWORDS:
-            tokens.add(cleaned)
-    return tokens
+    """Mock parity: split on runs of non-alphanumerics (frontend splits with
+    /[^a-z0-9]+/), so 'self-taught' → {'self', 'taught'}, not 'selftaught'."""
+    return {
+        tok
+        for tok in _TOKEN_RE.findall(text.lower())
+        if len(tok) > 2 and tok not in STOPWORDS
+    }
 
 
 def _s5(user: UserContext, bio) -> float:
-    theme_text = " ".join(th.replace("_", " ") for th in (user.themes or []))
+    theme_text = " ".join(th.replace("-", " ") for th in (user.themes or []))
     if (user.goal or "").strip():
         query_text = f"{user.goal} {theme_text} {user.era}"
     else:
