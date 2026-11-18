@@ -1,0 +1,8 @@
+{
+	"appId": "app.personaconnect",
+	"appName": "Persona Connect",
+	"webDir": "dist",
+	"server": {
+		"androidScheme": "https"
+	}
+}

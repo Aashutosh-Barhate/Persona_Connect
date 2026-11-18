@@ -1,0 +1,16 @@
+#Thu Nov 19 00:27:40 IST 2026
+path.4=0/classes.dex
+path.3=8/classes.dex
+path.2=5/classes.dex
+path.1=2/classes.dex
+path.0=classes.dex
+base.4=/Users/aashutosh/Desktop/Persona_Connect/Persona_Connect/frontend/android/app/build/intermediates/dex/debug/mergeProjectDexDebug/0/classes.dex
+base.3=/Users/aashutosh/Desktop/Persona_Connect/Persona_Connect/frontend/android/app/build/intermediates/dex/debug/mergeLibDexDebug/8/classes.dex
+base.2=/Users/aashutosh/Desktop/Persona_Connect/Persona_Connect/frontend/android/app/build/intermediates/dex/debug/mergeLibDexDebug/5/classes.dex
+base.1=/Users/aashutosh/Desktop/Persona_Connect/Persona_Connect/frontend/android/app/build/intermediates/dex/debug/mergeLibDexDebug/2/classes.dex
+base.0=/Users/aashutosh/Desktop/Persona_Connect/Persona_Connect/frontend/android/app/build/intermediates/dex/debug/mergeExtDexDebug/classes.dex
+renamed.3=classes4.dex
+renamed.2=classes3.dex
+renamed.1=classes2.dex
+renamed.0=classes.dex
+renamed.4=classes5.dex
